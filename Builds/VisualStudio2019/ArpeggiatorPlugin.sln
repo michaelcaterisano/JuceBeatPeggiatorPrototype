@@ -1,0 +1,38 @@
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2019
+
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ArpeggiatorPlugin - Standalone Plugin", "ArpeggiatorPlugin_StandalonePlugin.vcxproj", "{2BE62A0A-35BB-B22D-5CF4-899205315B14}"
+	ProjectSection(ProjectDependencies) = postProject
+		{2B667988-466A-469B-E657-E7593310C419} = {2B667988-466A-469B-E657-E7593310C419}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ArpeggiatorPlugin - VST3", "ArpeggiatorPlugin_VST3.vcxproj", "{D14B6E2D-0A93-1277-3FF7-64CBF4C845BE}"
+	ProjectSection(ProjectDependencies) = postProject
+		{2B667988-466A-469B-E657-E7593310C419} = {2B667988-466A-469B-E657-E7593310C419}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ArpeggiatorPlugin - Shared Code", "ArpeggiatorPlugin_SharedCode.vcxproj", "{2B667988-466A-469B-E657-E7593310C419}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D14B6E2D-0A93-1277-3FF7-64CBF4C845BE}.Debug|x64.ActiveCfg = Debug|x64
+		{D14B6E2D-0A93-1277-3FF7-64CBF4C845BE}.Debug|x64.Build.0 = Debug|x64
+		{D14B6E2D-0A93-1277-3FF7-64CBF4C845BE}.Release|x64.ActiveCfg = Release|x64
+		{D14B6E2D-0A93-1277-3FF7-64CBF4C845BE}.Release|x64.Build.0 = Release|x64
+		{2BE62A0A-35BB-B22D-5CF4-899205315B14}.Debug|x64.ActiveCfg = Debug|x64
+		{2BE62A0A-35BB-B22D-5CF4-899205315B14}.Debug|x64.Build.0 = Debug|x64
+		{2BE62A0A-35BB-B22D-5CF4-899205315B14}.Release|x64.ActiveCfg = Release|x64
+		{2BE62A0A-35BB-B22D-5CF4-899205315B14}.Release|x64.Build.0 = Release|x64
+		{2B667988-466A-469B-E657-E7593310C419}.Debug|x64.ActiveCfg = Debug|x64
+		{2B667988-466A-469B-E657-E7593310C419}.Debug|x64.Build.0 = Debug|x64
+		{2B667988-466A-469B-E657-E7593310C419}.Release|x64.ActiveCfg = Release|x64
+		{2B667988-466A-469B-E657-E7593310C419}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
