@@ -64,69 +64,116 @@ public:
         addParameter (speed = new AudioParameterFloat ("speed", "Arpeggiator Speed", 0.0, 1.0, 0.5));
     }
 
+       
+    //==============================================================================
+     void generateBeatMap(int &numNotes, int &beatDivision, std::vector<int> &beatMap)
+    {
+        
+         for (int i = 0; i < numNotes; i++)
+         {
+             int x = std::rand() % beatDivision;
+             while (beatMap[x] != 0)
+             {
+                 x = rand() % beatDivision;
+             }
+             beatMap[x] = 1;
+         }
+    }
+     
+     //==============================================================================
+     void generateNoteDurations(double &sampleRate, int &tempo, int &beats, int &beatDivision, std::vector<int> &beatMap)
+     {
+         
+         const int noteLength = sampleRate * (60.0/tempo) * ((double)beats/beatDivision);
+         int sum = noteLength;
+         
+         for (int i = 0; i < beatMap.size(); i++)
+         {
+             if (i == 0 && beatMap[i] == 0)
+             {
+                 continue;
+             }
+             else if (i == 0 && beatMap[i] == 1)
+             {
+                 noteStartTimes.push_back(sum);
+             }
+             else if (beatMap[i] == 0)
+             {
+                 sum = sum + noteLength;
+             }
+             else if (beatMap[i] == 1)
+             {
+                 sum = sum + noteLength;
+                 noteStartTimes.push_back(sum);
+                 sum = noteLength;
+             }
+         }
+     }
+    
+    //==============================================================================
+    void log(SortedSet<int> arr)
+    {
+        std::cout << "[";
+        for (const auto item : arr)
+        {
+            std::cout << item;
+            std::cout << ",";
+        }
+        std::cout << "]";
+    }
+
     //==============================================================================
     void prepareToPlay (double sampleRate, int samplesPerBlock) override
     {
         ignoreUnused (samplesPerBlock);
 
         notes.clear();
-        currentNote = 0;
-        lastNoteValue = -1;
+//        currentNote = 0;
+//        lastNoteValue = -1;
         time = 0;
+//        currentStartTimeIdx = 0;
+//        noteStartTime = 0;
+        noteSent = false;
         rate = static_cast<float> (sampleRate);
+        
+        generateBeatMap(numNotes, beatDivision, beatMap);
+        generateNoteDurations(sampleRate, tempo, beats, beatDivision, beatMap);
+        
     }
 
     void releaseResources() override {}
-
+    
+    int processCount = 0;
     void processBlock (AudioBuffer<float>& buffer, MidiBuffer& midi) override
     {
-        // the audio buffer in a midi effect will have zero channels!
-        jassert (buffer.getNumChannels() == 0);
-        
-        // however we use the buffer to get timing information
-        auto numSamples = buffer.getNumSamples();
-
-        // get note duration
-        //auto noteDuration = static_cast<int> (std::ceil (rate * 0.25f * (0.1f + (1.0f - *speed))));
-        std::array<int, 5> times = {44000, 22000, 33000, 11000, 55000};
+        processCount += 1;
         std::srand(std::time(NULL));
-        auto idx = (std::rand() % 4);
-        
-        auto noteDuration = times[idx];
+        jassert (buffer.getNumChannels() == 0);
+        auto numSamples = buffer.getNumSamples();
         
         for (const auto metadata : midi)
         {
             const auto msg = metadata.getMessage();
-            if      (msg.isNoteOn())  notes.add (msg.getNoteNumber());
-            else if (msg.isNoteOff()) notes.removeValue (msg.getNoteNumber());
-        }
-
-        midi.clear();
-        
-        
-        
-        if ((time + numSamples) >= noteDuration)
-        {
-           
-            
-            auto offset = jmax (0, jmin ((int) (noteDuration - time), numSamples - 1));
-
-            if (lastNoteValue > 0)
+            if (msg.isNoteOn())
             {
-                midi.addEvent (MidiMessage::noteOff (1, lastNoteValue), offset);
-                lastNoteValue = -1;
+                notes.add(msg.getNoteNumber());
+                //log(notes);
             }
-
-            if (notes.size() > 0)
+            if (msg.isNoteOff())
             {
-                currentNote = (currentNote + 1) % notes.size();
-                lastNoteValue = notes[currentNote];
-                midi.addEvent (MidiMessage::noteOn  (1, lastNoteValue, (uint8) 127), offset);
+                notes.remove(msg.getNoteNumber());
             }
-
         }
-
-        time = (time + numSamples) % noteDuration;
+                
+//        if (!noteSent)
+//        {
+//            MidiMessage noteOn = MidiMessage::noteOn(1, 64, (uint8) 127);
+//            MidiMessage noteOff = MidiMessage::noteOff(1, 64);
+//            midi.addEvent(noteOn, time);
+//            midi.addEvent(noteOff, time + 100);
+//            noteSent = true;
+//        }
+       
     }
 
     using AudioProcessor::processBlock;
