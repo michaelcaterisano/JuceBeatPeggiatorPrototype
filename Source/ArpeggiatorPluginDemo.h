@@ -146,17 +146,18 @@ public:
     void releaseResources() override {}
     
     int nextBeat = 0;
+    int noteNumber = 50;
     void processBlock (AudioBuffer<float>& buffer, MidiBuffer& midi) override
     {
         AudioPlayHead::CurrentPositionInfo info;
         getPlayHead()->getCurrentPosition(info);
         
-        if (!info.isPlaying)
-        {
-            nextBeat = 0;
-            time = 0;
-            midi.clear();
-        }
+//        if (!info.isPlaying)
+//        {
+//            nextBeat = 0;
+//            time = 0;
+//            midi.clear();
+//        }
         
         jassert (buffer.getNumChannels() == 0);
         auto numSamples = buffer.getNumSamples();
@@ -167,7 +168,7 @@ public:
             if (msg.isNoteOn())
             {
                 notes.add(msg.getNoteNumber());
-                log(notes);
+                DBG(msg.getDescription());
             }
             if (msg.isNoteOff())
             {
@@ -175,22 +176,31 @@ public:
             }
         }
         
-        //midi.clear();
+        midi.clear();
         
         // nextBeat is initialized to 0
         // numSamples = buffer.getNumSamples();
         // info is AudioPlayHead::CurrentPositionInfo
-        while (info.isPlaying && nextBeat >= time && nextBeat < time + numSamples)
+        
+        while (nextBeat >= info.ppqPosition && nextBeat < info.ppqPosition + .01)
         {
-            MidiMessage noteOn = MidiMessage::noteOn(1, 50, (uint8) 127);
-            MidiMessage noteOff = MidiMessage::noteOff(1, 50);
-            midi.addEvent(noteOn, nextBeat);
-            midi.addEvent(noteOff, nextBeat + 10000);
-            nextBeat += 44100;
+            MidiMessage noteOn = MidiMessage::noteOn(1, noteNumber, (uint8) 127);
+            MidiMessage noteOff = MidiMessage::noteOff(1, noteNumber);
+            midi.addEvent(noteOn, 0);
+            midi.addEvent(noteOff, 88000);
+            
+            for (const auto metadata : midi)
+            {
+                const auto msg = metadata.getMessage();
+                DBG(msg.getDescription());
+                DBG(msg.getTimeStamp());
+            }
+            nextBeat += 1;
+            noteNumber += 1;
             break;
         }
         
-        time = time + numSamples;
+        //time = time info.ppqPosition;
         
         //            auto noteLength = rate * (60.0/info.bpm);
 
