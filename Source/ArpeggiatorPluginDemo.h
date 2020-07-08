@@ -145,7 +145,7 @@ public:
 
     void releaseResources() override {}
     
-    int nextBeat = 0;
+    float nextBeat = 0;
     int noteNumber = 50;
     void processBlock (AudioBuffer<float>& buffer, MidiBuffer& midi) override
     {
@@ -168,7 +168,7 @@ public:
             if (msg.isNoteOn())
             {
                 notes.add(msg.getNoteNumber());
-                DBG(msg.getDescription());
+                //DBG(msg.getDescription());
             }
             if (msg.isNoteOff())
             {
@@ -176,42 +176,53 @@ public:
             }
         }
         
-        midi.clear();
+        //midi.clear();
         
         // nextBeat is initialized to 0
         // numSamples = buffer.getNumSamples();
         // info is AudioPlayHead::CurrentPositionInfo
         
-        while (nextBeat >= info.ppqPosition && nextBeat < info.ppqPosition + .01)
+        int beatDivision = 5;
+        double noteLength = rate * ((double) 60.0/info.bpm) * ((double) 1/beatDivision);
+        double blockStart = info.ppqPosition;
+        double blockEnd = (info.timeInSamples + numSamples) / (rate * ((double) 60.0/info.bpm));
+        
+        while (nextBeat >= blockStart && nextBeat < blockEnd)
         {
             MidiMessage noteOn = MidiMessage::noteOn(1, noteNumber, (uint8) 127);
             MidiMessage noteOff = MidiMessage::noteOff(1, noteNumber);
+
             midi.addEvent(noteOn, 0);
-            midi.addEvent(noteOff, 88000);
-            
-            for (const auto metadata : midi)
-            {
-                const auto msg = metadata.getMessage();
-                DBG(msg.getDescription());
-                DBG(msg.getTimeStamp());
-            }
-            nextBeat += 1;
-            noteNumber += 1;
+            midi.addEvent(noteOff, 1000);
+
+            DBG("blockStart: " + std::to_string(blockStart));
+            DBG("nextBeat: " + std::to_string(nextBeat));
+            DBG("blockEnd: " + std::to_string(blockEnd));
+            DBG("--------------------");
+            nextBeat += .2;
+
             break;
         }
         
-        //time = time info.ppqPosition;
+//        while (nextBeat >= info.timeInSamples && nextBeat < info.timeInSamples + numSamples)
+//        {
+//            MidiMessage noteOn = MidiMessage::noteOn(1, noteNumber, (uint8) 127);
+//            MidiMessage noteOff = MidiMessage::noteOff(1, noteNumber);
+//
+//            midi.addEvent(noteOn, 0);
+//            //midi.addEvent(noteOff, 1000);
+//
+//            DBG("blockStart: " + std::to_string(info.timeInSamples));
+//            DBG("nextBeat: " + std::to_string(nextBeat));
+//            DBG("blockEnd: " + std::to_string(info.timeInSamples + numSamples));
+//            DBG("numEvents: " + std::to_string(midi.getNumEvents()));
+//            DBG("--------------------");
+//            nextBeat += noteLength;
+//
+//            break;
+//        }
         
-        //            auto noteLength = rate * (60.0/info.bpm);
 
-        //            DBG("---------------------------");
-               //            DBG("beat: " + std::to_string(nextBeat));
-               //            DBG("ppq: " + std::to_string(info.ppqPosition));
-               //            DBG("timeInSamples: " + std::to_string(info.timeInSamples));
-               //            DBG("time: " + std::to_string(time));
-
-
-        
        
     }
 
