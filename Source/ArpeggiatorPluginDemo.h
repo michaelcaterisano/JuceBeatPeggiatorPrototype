@@ -52,6 +52,7 @@
 #include <iostream>
 #include <array>
 
+
 //==============================================================================
 class Arpeggiator  : public AudioProcessor
 {
@@ -61,6 +62,7 @@ public:
     Arpeggiator()
         : AudioProcessor (BusesProperties()) // add no audio buses at all
     {
+        std::srand(std::time(NULL));
         addParameter (speed = new AudioParameterFloat ("speed", "Arpeggiator Speed", 0.0, 1.0, 0.5));
     }
 
@@ -119,7 +121,7 @@ public:
             std::cout << item;
             std::cout << ",";
         }
-        std::cout << "]";
+        std::cout << "]" << std::endl;
     }
 
     //==============================================================================
@@ -143,11 +145,19 @@ public:
 
     void releaseResources() override {}
     
-    int processCount = 0;
+    int nextBeat = 0;
     void processBlock (AudioBuffer<float>& buffer, MidiBuffer& midi) override
     {
-        processCount += 1;
-        std::srand(std::time(NULL));
+        AudioPlayHead::CurrentPositionInfo info;
+        getPlayHead()->getCurrentPosition(info);
+        
+        if (!info.isPlaying)
+        {
+            nextBeat = 0;
+            time = 0;
+            midi.clear();
+        }
+        
         jassert (buffer.getNumChannels() == 0);
         auto numSamples = buffer.getNumSamples();
         
@@ -157,22 +167,41 @@ public:
             if (msg.isNoteOn())
             {
                 notes.add(msg.getNoteNumber());
-                //log(notes);
+                log(notes);
             }
             if (msg.isNoteOff())
             {
-                notes.remove(msg.getNoteNumber());
+                notes.removeValue(msg.getNoteNumber());
             }
         }
-                
-//        if (!noteSent)
-//        {
-//            MidiMessage noteOn = MidiMessage::noteOn(1, 64, (uint8) 127);
-//            MidiMessage noteOff = MidiMessage::noteOff(1, 64);
-//            midi.addEvent(noteOn, time);
-//            midi.addEvent(noteOff, time + 100);
-//            noteSent = true;
-//        }
+        
+        //midi.clear();
+        
+        // nextBeat is initialized to 0
+        // numSamples = buffer.getNumSamples();
+        // info is AudioPlayHead::CurrentPositionInfo
+        while (info.isPlaying && nextBeat >= time && nextBeat < time + numSamples)
+        {
+            MidiMessage noteOn = MidiMessage::noteOn(1, 50, (uint8) 127);
+            MidiMessage noteOff = MidiMessage::noteOff(1, 50);
+            midi.addEvent(noteOn, nextBeat);
+            midi.addEvent(noteOff, nextBeat + 10000);
+            nextBeat += 44100;
+            break;
+        }
+        
+        time = time + numSamples;
+        
+        //            auto noteLength = rate * (60.0/info.bpm);
+
+        //            DBG("---------------------------");
+               //            DBG("beat: " + std::to_string(nextBeat));
+               //            DBG("ppq: " + std::to_string(info.ppqPosition));
+               //            DBG("timeInSamples: " + std::to_string(info.timeInSamples));
+               //            DBG("time: " + std::to_string(time));
+
+
+        
        
     }
 
@@ -211,13 +240,24 @@ public:
     }
 
 private:
-    //==============================================================================
+   //==============================================================================
     AudioParameterFloat* speed;
     int currentNote, lastNoteValue;
     int time;
     float rate;
     SortedSet<int> notes;
-
+    
+    // my vars
+    int beatDivision = 5;
+    int numNotes = 2;
+    int beats = 1;
+    int tempo = 120;
+    int currentStartTimeIdx;
+    int noteStartTime;
+    bool noteSent;
+    std::vector<int> beatMap = std::vector<int>(beatDivision, 0);
+    std::vector<int> noteStartTimes;
+    
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Arpeggiator)
 };
