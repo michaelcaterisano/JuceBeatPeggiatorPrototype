@@ -64,11 +64,12 @@ public:
     {
         std::srand(std::time(NULL));
         addParameter (speed = new AudioParameterFloat ("speed", "Arpeggiator Speed", 0.0, 1.0, 0.5));
+        addParameter(beatDivision = new AudioParameterInt("beatDivision", "Beat Division", 0, 10, 5));
     }
 
        
     //==============================================================================
-     void generateBeatMap(int &numNotes, int &beatDivision, std::vector<int> &beatMap)
+     void generateBeatMap(int &numNotes, int beatDivision, std::vector<int> &beatMap)
     {
         
          for (int i = 0; i < numNotes; i++)
@@ -83,7 +84,7 @@ public:
     }
      
      //==============================================================================
-     void generateNoteDurations(double &sampleRate, int &tempo, int &beats, int &beatDivision, std::vector<int> &beatMap)
+     void generateNoteDurations(double &sampleRate, int &tempo, int &beats, int beatDivision, std::vector<int> &beatMap)
      {
          
          const int noteLength = sampleRate * (60.0/tempo) * ((double)beats/beatDivision);
@@ -138,8 +139,8 @@ public:
         noteSent = false;
         rate = static_cast<float> (sampleRate);
         
-        generateBeatMap(numNotes, beatDivision, beatMap);
-        generateNoteDurations(sampleRate, tempo, beats, beatDivision, beatMap);
+        //generateBeatMap(numNotes, *beatDivision, beatMap);
+        //generateNoteDurations(sampleRate, tempo, beats, *beatDivision, beatMap);
         
     }
 
@@ -259,23 +260,26 @@ public:
     void getStateInformation (MemoryBlock& destData) override
     {
         MemoryOutputStream (destData, true).writeFloat (*speed);
+        MemoryOutputStream (destData, true).writeInt (*beatDivision);
     }
 
     void setStateInformation (const void* data, int sizeInBytes) override
     {
         speed->setValueNotifyingHost (MemoryInputStream (data, static_cast<size_t> (sizeInBytes), false).readFloat());
+        beatDivision->setValueNotifyingHost (MemoryInputStream (data, static_cast<size_t> (sizeInBytes), false).readInt());
     }
 
 private:
    //==============================================================================
     AudioParameterFloat* speed;
+    AudioParameterInt* beatDivision;
     int currentNote, lastNoteValue;
     int time;
     float rate;
     SortedSet<int> notes;
     
     // my vars
-    int beatDivision = 5;
+    //int beatDivision = 5;
     int numNotes = 2;
     int beats = 1;
     int tempo = 120;
