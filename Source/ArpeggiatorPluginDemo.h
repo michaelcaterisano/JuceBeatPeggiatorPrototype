@@ -187,16 +187,20 @@ public:
         double blockStart = info.ppqPosition;
         double blockEnd = (info.timeInSamples + numSamples) / (rate * ((double) 60.0/info.bpm));
         
-        while (nextBeat >= blockStart && nextBeat < blockEnd)
+         while (nextBeat >= blockStart && nextBeat < blockEnd)
         {
             MidiMessage noteOn = MidiMessage::noteOn(1, noteNumber, (uint8) 127);
             MidiMessage noteOff = MidiMessage::noteOff(1, noteNumber);
 
-            midi.addEvent(noteOn, 0);
+            // adjust note start to be in correct position
+            int noteStart = std::round(nextBeat * (rate * (double) 60.0/info.bpm)) - info.timeInSamples;
+
+            midi.addEvent(noteOn, noteStart);
             midi.addEvent(noteOff, 1000);
 
-            DBG("blockStart: " + std::to_string(blockStart));
-            DBG("nextBeat: " + std::to_string(nextBeat));
+            DBG("blockStart: " + std::to_string(info.ppqPosition));
+            DBG("nextBeat:" + std::to_string(nextBeat));
+            DBG("noteStart: " + std::to_string(noteStart));
             DBG("blockEnd: " + std::to_string(blockEnd));
             DBG("--------------------");
             nextBeat += .2;
@@ -209,13 +213,15 @@ public:
 //            MidiMessage noteOn = MidiMessage::noteOn(1, noteNumber, (uint8) 127);
 //            MidiMessage noteOff = MidiMessage::noteOff(1, noteNumber);
 //
-//            midi.addEvent(noteOn, 0);
-//            //midi.addEvent(noteOff, 1000);
+//            int noteStart = nextBeat - info.timeInSamples;
+//
+//            midi.addEvent(noteOn, noteStart);
+//            midi.addEvent(noteOff, 1000);
 //
 //            DBG("blockStart: " + std::to_string(info.timeInSamples));
 //            DBG("nextBeat: " + std::to_string(nextBeat));
+//            DBG("noteStart: " + std::to_string(noteStart));
 //            DBG("blockEnd: " + std::to_string(info.timeInSamples + numSamples));
-//            DBG("numEvents: " + std::to_string(midi.getNumEvents()));
 //            DBG("--------------------");
 //            nextBeat += noteLength;
 //
