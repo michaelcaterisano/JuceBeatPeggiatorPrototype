@@ -63,14 +63,15 @@ public:
         : AudioProcessor (BusesProperties()) // add no audio buses at all
     {
         std::srand(std::time(NULL));
-        addParameter (speed = new AudioParameterFloat ("speed", "Arpeggiator Speed", 0.0, 1.0, 0.5));
-        addParameter(beatDivision = new AudioParameterInt("beatDivision", "Beat Division", 0, 10, 5));
+        //addParameter (speed = new AudioParameterFloat ("speed", "Arpeggiator Speed", 0.0, 1.0, 0.5));
+        addParameter(beatDivision = new AudioParameterInt("beatDivision", "Beat Division", 0, 10, 6));
     }
 
        
     //==============================================================================
      void generateBeatMap(int &numNotes, int beatDivision, std::vector<int> &beatMap)
     {
+        beatMap = std::vector<int>(beatDivision, 0);
         
          for (int i = 0; i < numNotes; i++)
          {
@@ -178,13 +179,8 @@ public:
         }
         
         //midi.clear();
-        
-        // nextBeat is initialized to 0
-        // numSamples = buffer.getNumSamples();
-        // info is AudioPlayHead::CurrentPositionInfo
-        
-        int beatDivision = 5;
-        double noteLength = rate * ((double) 60.0/info.bpm) * ((double) 1/beatDivision);
+         
+        //double noteLength = rate * ((double) 60.0/info.bpm) * ((double) 1/ *beatDivision);
         double blockStart = info.ppqPosition;
         double blockEnd = (info.timeInSamples + numSamples) / (rate * ((double) 60.0/info.bpm));
         
@@ -199,12 +195,13 @@ public:
             midi.addEvent(noteOn, noteStart);
             midi.addEvent(noteOff, 1000);
 
-            DBG("blockStart: " + std::to_string(info.ppqPosition));
-            DBG("nextBeat:" + std::to_string(nextBeat));
-            DBG("noteStart: " + std::to_string(noteStart));
-            DBG("blockEnd: " + std::to_string(blockEnd));
-            DBG("--------------------");
-            nextBeat += .2;
+//            DBG("blockStart: " + std::to_string(info.ppqPosition));
+//            DBG("nextBeat:" + std::to_string(nextBeat));
+//            DBG("noteStart: " + std::to_string(noteStart));
+//            DBG("blockEnd: " + std::to_string(blockEnd));
+//            DBG("--------------------");
+              DBG("beatDivision: " + std::to_string(*beatDivision));
+              nextBeat += (float) 1 / *beatDivision;
 
             break;
         }
@@ -259,19 +256,19 @@ public:
     //==============================================================================
     void getStateInformation (MemoryBlock& destData) override
     {
-        MemoryOutputStream (destData, true).writeFloat (*speed);
+        //MemoryOutputStream (destData, true).writeFloat (*speed);
         MemoryOutputStream (destData, true).writeInt (*beatDivision);
     }
 
     void setStateInformation (const void* data, int sizeInBytes) override
     {
-        speed->setValueNotifyingHost (MemoryInputStream (data, static_cast<size_t> (sizeInBytes), false).readFloat());
-        beatDivision->setValueNotifyingHost (MemoryInputStream (data, static_cast<size_t> (sizeInBytes), false).readInt());
+        //speed->setValueNotifyingHost (MemoryInputStream (data, static_cast<size_t> (sizeInBytes), false).readFloat());
+        beatDivision->setValueNotifyingHost (MemoryInputStream (data, static_cast<size_t> (sizeInBytes), false).readFloat ());
     }
 
 private:
    //==============================================================================
-    AudioParameterFloat* speed;
+    //AudioParameterFloat* speed;
     AudioParameterInt* beatDivision;
     int currentNote, lastNoteValue;
     int time;
@@ -286,7 +283,7 @@ private:
     int currentStartTimeIdx;
     int noteStartTime;
     bool noteSent;
-    std::vector<int> beatMap = std::vector<int>(beatDivision, 0);
+    std::vector<int> beatMap;
     std::vector<int> noteStartTimes;
     
     //==============================================================================
