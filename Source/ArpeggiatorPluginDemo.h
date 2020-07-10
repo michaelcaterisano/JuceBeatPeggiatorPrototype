@@ -64,13 +64,15 @@ public:
     {
         std::srand(std::time(NULL));
         //addParameter (speed = new AudioParameterFloat ("speed", "Arpeggiator Speed", 0.0, 1.0, 0.5));
-        addParameter(beatDivision = new AudioParameterInt("beatDivision", "Beat Division", 0, 10, 6));
+        addParameter(beatDivision = new AudioParameterInt("beatDivision", "Beat Division", 1, 10, 4));
     }
 
        
     //==============================================================================
      void generateBeatMap(int &numNotes, int beatDivision, std::vector<int> &beatMap)
     {
+//        DBG("generateBeatMap()");
+//        DBG("beatDivision: " + std::to_string(beatDivision));
         beatMap = std::vector<int>(beatDivision, 0);
         
          for (int i = 0; i < numNotes; i++)
@@ -85,37 +87,61 @@ public:
     }
      
      //==============================================================================
-     void generateNoteDurations(double &sampleRate, int &tempo, int &beats, int beatDivision, std::vector<int> &beatMap)
-     {
-         
-         const int noteLength = sampleRate * (60.0/tempo) * ((double)beats/beatDivision);
-         int sum = noteLength;
-         
-         for (int i = 0; i < beatMap.size(); i++)
-         {
-             if (i == 0 && beatMap[i] == 0)
-             {
-                 continue;
-             }
-             else if (i == 0 && beatMap[i] == 1)
-             {
-                 noteStartTimes.push_back(sum);
-             }
-             else if (beatMap[i] == 0)
-             {
-                 sum = sum + noteLength;
-             }
-             else if (beatMap[i] == 1)
-             {
-                 sum = sum + noteLength;
-                 noteStartTimes.push_back(sum);
-                 sum = noteLength;
-             }
-         }
-     }
+//     void generateNoteDurations(float &tempo, int &beats, int beatDivision, std::vector<int> &beatMap)
+//     {
+//         const double noteLength = (double) beats/beatDivision;
+//         double sum = 0.0;
+//
+//         for (int i = 0; i < beatMap.size(); i++)
+//         {
+//             if (i == 0 && beatMap[i] == 0)
+//             {
+//
+//                 continue;
+//             }
+//             else if (i == 0 && beatMap[i] == 1)
+//             {
+//
+//                 noteDurations.push_back(sum);
+//             }
+//             else if (beatMap[i] == 0)
+//             {
+//
+//                 sum = sum + noteLength;
+//             }
+//             else if (beatMap[i] == 1)
+//             {
+//
+//                 sum = sum + noteLength;
+//                 noteDurations.push_back(sum);
+//                 sum = 0.0;
+//             }
+//         }
+//     }
+    //==============================================================================
+    void generateNoteDurations(int beatDivision)
+    {
+        double offset = (double) 1 / beatDivision;
+        for (int i = 0; i < beatMap.size(); i++)
+        {
+            if (beatMap[i] == 1)
+            {
+                noteDurations.push_back(offset * i);
+            }
+        }
+    }
     
     //==============================================================================
-    void log(SortedSet<int> arr)
+    void generateBeatPositions(AudioPlayHead::CurrentPositionInfo& info)
+    {
+        for (double duration : noteDurations)
+        {
+            beatPositions.push_back(std::ceil(info.ppqPosition) + duration);
+        }
+    }
+    
+    //==============================================================================
+    void logDoubleVector(std::vector<double> arr)
     {
         std::cout << "[";
         for (const auto item : arr)
@@ -125,7 +151,28 @@ public:
         }
         std::cout << "]" << std::endl;
     }
-
+    
+    void logIntVector(std::vector<int> arr)
+    {
+        std::cout << "[";
+        for (const auto item : arr)
+        {
+            std::cout << item;
+            std::cout << ",";
+        }
+        std::cout << "]" << std::endl;
+    }
+    
+    
+    //==============================================================================
+    void Reset()
+    {
+        currentPosition = 0;
+        beatMap.clear();
+        noteDurations.clear();
+        beatPositions.clear();
+        newBeat = true;
+    }
     //==============================================================================
     void prepareToPlay (double sampleRate, int samplesPerBlock) override
     {
@@ -135,31 +182,44 @@ public:
 //        currentNote = 0;
 //        lastNoteValue = -1;
         time = 0;
-//        currentStartTimeIdx = 0;
-//        noteStartTime = 0;
+        currentPosition = 0;
+        newBeat = true;
         noteSent = false;
-        rate = static_cast<float> (sampleRate);
-        
-        //generateBeatMap(numNotes, *beatDivision, beatMap);
-        //generateNoteDurations(sampleRate, tempo, beats, *beatDivision, beatMap);
+        rate = sampleRate;
         
     }
 
     void releaseResources() override {}
     
-    float nextBeat = 0;
-    int noteNumber = 50;
+    //==============================================================================
+    void sendNotes(MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& info)
+    {
+        int idx = notes.size() == 0 ? 0 : std::rand() % notes.size();
+        DBG("idx: " + std::to_string(idx));
+        int noteNumber = notes[idx];
+        MidiMessage noteOn = MidiMessage::noteOn(1, noteNumber, (uint8) 127);
+        MidiMessage noteOff = MidiMessage::noteOff(1, noteNumber);
+
+        // adjust note start to be in correct position
+        int noteStart = std::round(nextBeat * (rate * (double) 60.0/info.bpm)) - info.timeInSamples;
+
+        midi.addEvent(noteOn, noteStart);
+        midi.addEvent(noteOff, 1000);
+    }
+    
+    //==============================================================================
+
     void processBlock (AudioBuffer<float>& buffer, MidiBuffer& midi) override
     {
         AudioPlayHead::CurrentPositionInfo info;
         getPlayHead()->getCurrentPosition(info);
         
-//        if (!info.isPlaying)
-//        {
-//            nextBeat = 0;
-//            time = 0;
-//            midi.clear();
-//        }
+        if (!info.isPlaying)
+        {
+            newBeat = true;
+        }
+        
+        tempo = info.bpm;
         
         jassert (buffer.getNumChannels() == 0);
         auto numSamples = buffer.getNumSamples();
@@ -170,7 +230,7 @@ public:
             if (msg.isNoteOn())
             {
                 notes.add(msg.getNoteNumber());
-                //DBG(msg.getDescription());
+                DBG("notes: " + std::to_string(notes[0]));
             }
             if (msg.isNoteOff())
             {
@@ -178,56 +238,80 @@ public:
             }
         }
         
-        //midi.clear();
+        midi.clear();
          
         //double noteLength = rate * ((double) 60.0/info.bpm) * ((double) 1/ *beatDivision);
-        double blockStart = info.ppqPosition;
-        double blockEnd = (info.timeInSamples + numSamples) / (rate * ((double) 60.0/info.bpm));
+       
         
-         while (nextBeat >= blockStart && nextBeat < blockEnd)
+        
+        if (!notes.isEmpty() && info.isPlaying)
         {
-            MidiMessage noteOn = MidiMessage::noteOn(1, noteNumber, (uint8) 127);
-            MidiMessage noteOff = MidiMessage::noteOff(1, noteNumber);
+            if (newBeat)
+            {
+                DBG("NEW BEAT/////////////////////");
+                
+                beatMap.clear();
+                noteDurations.clear();
+                beatPositions.clear();
+                
+                generateBeatMap(numNotes, *beatDivision, beatMap);
+                generateNoteDurations(*beatDivision);
+                generateBeatPositions(info);
 
-            // adjust note start to be in correct position
-            int noteStart = std::round(nextBeat * (rate * (double) 60.0/info.bpm)) - info.timeInSamples;
+                logIntVector(beatMap);
+                logDoubleVector(noteDurations);
+                logDoubleVector(beatPositions);
+                
+                
+                newBeat = false;
+            }
+            
+            nextBeat = beatPositions[currentPosition];
 
-            midi.addEvent(noteOn, noteStart);
-            midi.addEvent(noteOff, 1000);
+//            if (blockStart > nextBeat)
+//            {
+//                nextBeat = blockStart;
+//            }
+            
+            double blockStart = info.ppqPosition;
+            double blockEnd = (info.timeInSamples + numSamples) / (rate * ((double) 60.0/info.bpm));
 
-//            DBG("blockStart: " + std::to_string(info.ppqPosition));
-//            DBG("nextBeat:" + std::to_string(nextBeat));
-//            DBG("noteStart: " + std::to_string(noteStart));
-//            DBG("blockEnd: " + std::to_string(blockEnd));
-//            DBG("--------------------");
-              DBG("beatDivision: " + std::to_string(*beatDivision));
-              nextBeat += (float) 1 / *beatDivision;
+             while (nextBeat >= blockStart && nextBeat < blockEnd)
+            {
+                
+                DBG("beatDivision: " + std::to_string(*beatDivision));
+                DBG("blockStart: " + std::to_string(info.ppqPosition));
+                DBG("nextBeat:" + std::to_string(nextBeat));
+                DBG("blockEnd: " + std::to_string(blockEnd));
+                DBG("--------------------");
 
-            break;
+                sendNotes(midi, info);
+                
+                if (numNotes == 1)
+                {
+                    newBeat = true;
+                    break;
+                }
+
+                if (currentPosition >= noteDurations.size() - 1)
+                {
+                    currentPosition = 0;
+                    newBeat = true;
+                    break;
+                }
+                else
+                {
+                    currentPosition += 1;
+                    nextBeat = noteDurations[currentPosition];
+                }
+            }
         }
         
-//        while (nextBeat >= info.timeInSamples && nextBeat < info.timeInSamples + numSamples)
-//        {
-//            MidiMessage noteOn = MidiMessage::noteOn(1, noteNumber, (uint8) 127);
-//            MidiMessage noteOff = MidiMessage::noteOff(1, noteNumber);
-//
-//            int noteStart = nextBeat - info.timeInSamples;
-//
-//            midi.addEvent(noteOn, noteStart);
-//            midi.addEvent(noteOff, 1000);
-//
-//            DBG("blockStart: " + std::to_string(info.timeInSamples));
-//            DBG("nextBeat: " + std::to_string(nextBeat));
-//            DBG("noteStart: " + std::to_string(noteStart));
-//            DBG("blockEnd: " + std::to_string(info.timeInSamples + numSamples));
-//            DBG("--------------------");
-//            nextBeat += noteLength;
-//
-//            break;
-//        }
+        if (notes.isEmpty())
+            {
+                Reset();
+            }
         
-
-       
     }
 
     using AudioProcessor::processBlock;
@@ -256,36 +340,32 @@ public:
     //==============================================================================
     void getStateInformation (MemoryBlock& destData) override
     {
-        //MemoryOutputStream (destData, true).writeFloat (*speed);
         MemoryOutputStream (destData, true).writeInt (*beatDivision);
     }
 
     void setStateInformation (const void* data, int sizeInBytes) override
     {
-        //speed->setValueNotifyingHost (MemoryInputStream (data, static_cast<size_t> (sizeInBytes), false).readFloat());
         beatDivision->setValueNotifyingHost (MemoryInputStream (data, static_cast<size_t> (sizeInBytes), false).readFloat ());
     }
 
 private:
    //==============================================================================
-    //AudioParameterFloat* speed;
     AudioParameterInt* beatDivision;
     int currentNote, lastNoteValue;
     int time;
-    float rate;
+    double rate;
     SortedSet<int> notes;
-    
-    // my vars
-    //int beatDivision = 5;
-    int numNotes = 2;
+    int numNotes = 3;
     int beats = 1;
-    int tempo = 120;
-    int currentStartTimeIdx;
+    float tempo;
+    double nextBeat;
+    int currentPosition;
     int noteStartTime;
     bool noteSent;
+    bool newBeat;
     std::vector<int> beatMap;
-    std::vector<int> noteStartTimes;
-    
+    std::vector<double> noteDurations;
+    std::vector<double> beatPositions;
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Arpeggiator)
 };
