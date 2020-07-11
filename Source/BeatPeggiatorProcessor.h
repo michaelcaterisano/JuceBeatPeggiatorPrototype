@@ -23,11 +23,11 @@
 
  BEGIN_JUCE_PIP_METADATA
 
- name:                  ArpeggiatorPlugin
+ name:                  BeatPeggiatorPlugin
  version:               1.0.0
  vendor:                JUCE
  website:               http://juce.com
- description:           Arpeggiator audio plugin.
+ description:           BeatPeggiator audio plugin.
 
  dependencies:          juce_audio_basics, juce_audio_devices, juce_audio_formats,
                         juce_audio_plugin_client, juce_audio_processors,
@@ -38,7 +38,7 @@
  moduleFlags:           JUCE_STRICT_REFCOUNTEDPOINTER=1
 
  type:                  AudioProcessor
- mainClass:             Arpeggiator
+ mainClass:             BeatPeggiator
 
  useLocalCopy:          1
 
@@ -54,20 +54,21 @@
 
 
 //==============================================================================
-class Arpeggiator  : public AudioProcessor
+class BeatPeggiatorProcessor  : public AudioProcessor, private AudioProcessorValueTreeState::Listener
 {
 public:
 
     //==============================================================================
-    Arpeggiator()
-        : AudioProcessor (BusesProperties())
+    BeatPeggiatorProcessor()
+        : AudioProcessor (BusesProperties()),
+          parameters(*this, nullptr, "BeatPeggiator",
+          {std::make_unique<AudioParameterInt> ("beats", "Beats", 1, 10, 1) })
     {
+        parameters.addParameterListener("beats", this);
+        
         std::srand(std::time(NULL));
-        //addParameter (speed = new AudioParameterFloat ("speed", "Arpeggiator Speed", 0.0, 1.0, 0.5));
-        addParameter(beatDivision = new AudioParameterInt("beatDivision", "Beat Division", 1, 10, 4));
-        addParameter(numNotes = new AudioParameterInt("numNotes", "Number Of Notes", 1, 10, 4));
-        
-        
+        addParameter(beatDivision = new AudioParameterInt("beatDivision", "Beat Division", 1, 10, 1));
+        addParameter(numNotes = new AudioParameterInt("numNotes", "Number Of Notes", 1, 10, 1));
         
     }
 
@@ -227,7 +228,10 @@ public:
         {
             newBeat = true;
         }
-                
+        
+        auto beatsValue = parameters.getRawParameterValue("beats")->load();
+//        DBG("beatsValue: " + std::to_string(beatsValue));
+                                
         for (const auto metadata : midi)
         {
             const auto msg = metadata.getMessage();
@@ -320,11 +324,11 @@ public:
     bool isMidiEffect() const override                     { return true; }
 
     //==============================================================================
-    AudioProcessorEditor* createEditor() override          { return new GenericAudioProcessorEditor (*this); }
+    AudioProcessorEditor* createEditor() override          { return new BeatPeggiatorEditor (*this, parameters); }
     bool hasEditor() const override                        { return true; }
 
     //==============================================================================
-    const String getName() const override                  { return "Arpeggiator"; }
+    const String getName() const override                  { return "BeatPeggiator"; }
 
     bool acceptsMidi() const override                      { return true; }
     bool producesMidi() const override                     { return true; }
@@ -337,7 +341,16 @@ public:
     const String getProgramName (int) override             { return {}; }
     void changeProgramName (int, const String&) override   {}
 
+
     //==============================================================================
+    
+    void parameterChanged (const String& parameterID, float newValue) override
+    {
+//        DBG("parameterChanged");
+//        DBG(parameterID + ": " + std::to_string(newValue));
+    }
+    //==============================================================================
+
     void getStateInformation (MemoryBlock& destData) override
     {
         DBG("getState");
@@ -351,12 +364,59 @@ public:
         beatDivision->setValueNotifyingHost (MemoryInputStream (data, static_cast<size_t> (sizeInBytes), false).readFloat());
         numNotes->setValueNotifyingHost (MemoryInputStream (data, static_cast<size_t> (sizeInBytes), false).readFloat());
     }
+    
 
 private:
+    
+    class BeatPeggiatorEditor : public AudioProcessorEditor
+    {
+    public:
+        BeatPeggiatorEditor (BeatPeggiatorProcessor& p, AudioProcessorValueTreeState& vts)
+        : AudioProcessorEditor (p),
+          parameters (vts)
+        {
+            //Int
+            beatsSlider.setSliderStyle (Slider::SliderStyle::LinearHorizontal);
+            beatsSlider.setTextBoxStyle (Slider::TextEntryBoxPosition::TextBoxBelow, true, 50, 10);
+            beatsSlider.setRange (0, 10, 1);
+            addAndMakeVisible (beatsSlider);
+            
+            beatsAttachment = std::make_unique<AudioProcessorValueTreeState::SliderAttachment> (parameters, "beats", beatsSlider);
+            
+            setSize (400, 800);
+
+        }
+        
+        void paint (Graphics& g) override
+        {
+            g.fillAll (Colours::black);
+                        
+        }
+        
+        void resized () override
+        {
+            auto bounds = getLocalBounds();
+            const int componentSize { 100 };
+            
+            beatsSlider.setBounds (bounds.removeFromTop (200).withSizeKeepingCentre (componentSize, componentSize));
+        }
+        
+    private:
+        AudioProcessorValueTreeState& parameters;
+        
+        Slider beatsSlider;
+        
+        std::unique_ptr<AudioProcessorValueTreeState::SliderAttachment> beatsAttachment;
+        
+
+        //==============================================================================
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (BeatPeggiatorEditor)
+    };
    //==============================================================================
+    AudioProcessorValueTreeState parameters;
     AudioParameterInt* beatDivision;
     AudioParameterInt* numNotes;
-//    AudioProcessorValueTreeState mAPVTS;
+    
     int currentNote, lastNoteValue;
     int prevNumNotes, prevBeatDivision;
     int time;
@@ -373,5 +433,5 @@ private:
     std::vector<double> noteDurations;
     std::vector<double> beatPositions;
     //==============================================================================
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Arpeggiator)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (BeatPeggiatorProcessor)
 };

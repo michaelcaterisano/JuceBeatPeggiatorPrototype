@@ -7,11 +7,11 @@
 */
 
 #include <JuceHeader.h>
-#include "ArpeggiatorPluginDemo.h"
+#include "BeatPeggiatorProcessor.h"
 
 //==============================================================================
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     
-    return new Arpeggiator();
+    return new BeatPeggiatorProcessor();
 }
