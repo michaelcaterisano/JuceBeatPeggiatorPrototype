@@ -60,16 +60,20 @@ public:
 
     //==============================================================================
     Arpeggiator()
-        : AudioProcessor (BusesProperties()) // add no audio buses at all
+        : AudioProcessor (BusesProperties())
     {
         std::srand(std::time(NULL));
         //addParameter (speed = new AudioParameterFloat ("speed", "Arpeggiator Speed", 0.0, 1.0, 0.5));
         addParameter(beatDivision = new AudioParameterInt("beatDivision", "Beat Division", 1, 10, 4));
+        addParameter(numNotes = new AudioParameterInt("numNotes", "Number Of Notes", 1, 10, 4));
+        
+        
+        
     }
 
        
     //==============================================================================
-     void generateBeatMap(int &numNotes, int beatDivision, std::vector<int> &beatMap)
+     void generateBeatMap(int numNotes, int beatDivision, std::vector<int> &beatMap)
     {
 //        DBG("generateBeatMap()");
 //        DBG("beatDivision: " + std::to_string(beatDivision));
@@ -176,6 +180,7 @@ public:
     //==============================================================================
     void prepareToPlay (double sampleRate, int samplesPerBlock) override
     {
+        DBG("PREPARE");
         ignoreUnused (samplesPerBlock);
 
         notes.clear();
@@ -186,7 +191,8 @@ public:
         newBeat = true;
         noteSent = false;
         rate = sampleRate;
-        
+        prevNumNotes = numNotes->get();
+        prevBeatDivision = beatDivision->get();
     }
 
     void releaseResources() override {}
@@ -195,7 +201,7 @@ public:
     void sendNotes(MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& info)
     {
         int idx = notes.size() == 0 ? 0 : std::rand() % notes.size();
-        DBG("idx: " + std::to_string(idx));
+//        DBG("idx: " + std::to_string(idx));
         int noteNumber = notes[idx];
         MidiMessage noteOn = MidiMessage::noteOn(1, noteNumber, (uint8) 127);
         MidiMessage noteOff = MidiMessage::noteOff(1, noteNumber);
@@ -213,24 +219,22 @@ public:
     {
         AudioPlayHead::CurrentPositionInfo info;
         getPlayHead()->getCurrentPosition(info);
-        
+        tempo = info.bpm;
+        jassert (buffer.getNumChannels() == 0);
+        auto numSamples = buffer.getNumSamples();
+                
         if (!info.isPlaying)
         {
             newBeat = true;
         }
-        
-        tempo = info.bpm;
-        
-        jassert (buffer.getNumChannels() == 0);
-        auto numSamples = buffer.getNumSamples();
-        
+                
         for (const auto metadata : midi)
         {
             const auto msg = metadata.getMessage();
             if (msg.isNoteOn())
             {
                 notes.add(msg.getNoteNumber());
-                DBG("notes: " + std::to_string(notes[0]));
+//                DBG("notes: " + std::to_string(notes[0]));
             }
             if (msg.isNoteOff())
             {
@@ -239,31 +243,27 @@ public:
         }
         
         midi.clear();
-         
-        //double noteLength = rate * ((double) 60.0/info.bpm) * ((double) 1/ *beatDivision);
-       
-        
         
         if (!notes.isEmpty() && info.isPlaying)
         {
             if (newBeat)
             {
-                DBG("NEW BEAT/////////////////////");
+//                DBG("NEW BEAT/////////////////////");
                 
                 beatMap.clear();
                 noteDurations.clear();
                 beatPositions.clear();
                 
-                generateBeatMap(numNotes, *beatDivision, beatMap);
+                generateBeatMap(*numNotes, *beatDivision, beatMap);
                 generateNoteDurations(*beatDivision);
                 generateBeatPositions(info);
-
-                logIntVector(beatMap);
-                logDoubleVector(noteDurations);
-                logDoubleVector(beatPositions);
-                
                 
                 newBeat = false;
+
+//                logIntVector(beatMap);
+//                logDoubleVector(noteDurations);
+//                logDoubleVector(beatPositions);
+                
             }
             
             nextBeat = beatPositions[currentPosition];
@@ -279,15 +279,15 @@ public:
              while (nextBeat >= blockStart && nextBeat < blockEnd)
             {
                 
-                DBG("beatDivision: " + std::to_string(*beatDivision));
-                DBG("blockStart: " + std::to_string(info.ppqPosition));
-                DBG("nextBeat:" + std::to_string(nextBeat));
-                DBG("blockEnd: " + std::to_string(blockEnd));
-                DBG("--------------------");
+//                DBG("beatDivision: " + std::to_string(*beatDivision));
+//                DBG("blockStart: " + std::to_string(info.ppqPosition));
+//                DBG("nextBeat:" + std::to_string(nextBeat));
+//                DBG("blockEnd: " + std::to_string(blockEnd));
+//                DBG("--------------------");
 
                 sendNotes(midi, info);
                 
-                if (numNotes == 1)
+                if (*numNotes == 1)
                 {
                     newBeat = true;
                     break;
@@ -340,22 +340,28 @@ public:
     //==============================================================================
     void getStateInformation (MemoryBlock& destData) override
     {
+        DBG("getState");
         MemoryOutputStream (destData, true).writeInt (*beatDivision);
+        MemoryOutputStream (destData, true).writeInt (*numNotes);
     }
 
     void setStateInformation (const void* data, int sizeInBytes) override
     {
-        beatDivision->setValueNotifyingHost (MemoryInputStream (data, static_cast<size_t> (sizeInBytes), false).readFloat ());
+        DBG("setState");
+        beatDivision->setValueNotifyingHost (MemoryInputStream (data, static_cast<size_t> (sizeInBytes), false).readFloat());
+        numNotes->setValueNotifyingHost (MemoryInputStream (data, static_cast<size_t> (sizeInBytes), false).readFloat());
     }
 
 private:
    //==============================================================================
     AudioParameterInt* beatDivision;
+    AudioParameterInt* numNotes;
+//    AudioProcessorValueTreeState mAPVTS;
     int currentNote, lastNoteValue;
+    int prevNumNotes, prevBeatDivision;
     int time;
     double rate;
     SortedSet<int> notes;
-    int numNotes = 3;
     int beats = 1;
     float tempo;
     double nextBeat;
