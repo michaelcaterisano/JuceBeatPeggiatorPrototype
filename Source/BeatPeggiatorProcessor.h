@@ -52,6 +52,70 @@
 #include <iostream>
 #include <array>
 
+class BeatPeggiatorEditor : public AudioProcessorEditor
+{
+public:
+    BeatPeggiatorEditor (AudioProcessor& p, AudioProcessorValueTreeState& vts)
+    : AudioProcessorEditor (p),
+      parameters (vts)
+    {
+        numNotesSlider.setSliderStyle (Slider::SliderStyle::LinearHorizontal);
+        numNotesSlider.setTextBoxStyle (Slider::TextEntryBoxPosition::TextBoxBelow, true, 50, 10);
+        numNotesSlider.setRange (0, 10, 1);
+        addAndMakeVisible (numNotesSlider);
+        
+        beatDivisionSlider.setSliderStyle (Slider::SliderStyle::LinearHorizontal);
+        beatDivisionSlider.setTextBoxStyle (Slider::TextEntryBoxPosition::TextBoxBelow, true, 50, 10);
+        beatDivisionSlider.setRange (0, 10, 1);
+        addAndMakeVisible (beatDivisionSlider);
+        
+        beatsSlider.setSliderStyle (Slider::SliderStyle::LinearHorizontal);
+        beatsSlider.setTextBoxStyle (Slider::TextEntryBoxPosition::TextBoxBelow, true, 50, 10);
+        beatsSlider.setRange (0, 10, 1);
+        addAndMakeVisible (beatsSlider);
+
+        numNotesAttachment = std::make_unique<AudioProcessorValueTreeState::SliderAttachment> (parameters, "numNotes", numNotesSlider);
+        beatDivisionAttachment = std::make_unique<AudioProcessorValueTreeState::SliderAttachment> (parameters, "beatDivision", beatDivisionSlider);
+
+        beatsAttachment = std::make_unique<AudioProcessorValueTreeState::SliderAttachment> (parameters, "beats", beatsSlider);
+
+
+        setSize (400, 800);
+
+    }
+    
+    void paint (Graphics& g) override
+    {
+        g.fillAll (Colours::black);
+                    
+    }
+    
+    void resized () override
+    {
+        auto bounds = getLocalBounds();
+        const int componentSize { 100 };
+        
+        numNotesSlider.setBounds (bounds.removeFromTop (200).withSizeKeepingCentre (componentSize, componentSize));
+        beatDivisionSlider.setBounds (bounds.removeFromTop (200).withSizeKeepingCentre (componentSize, componentSize));
+        beatsSlider.setBounds (bounds.removeFromTop (200).withSizeKeepingCentre (componentSize, componentSize));
+    }
+    
+private:
+    AudioProcessorValueTreeState& parameters;
+    
+    Slider beatsSlider;
+    Slider beatDivisionSlider;
+    Slider numNotesSlider;
+    
+    std::unique_ptr<AudioProcessorValueTreeState::SliderAttachment> beatsAttachment;
+    std::unique_ptr<AudioProcessorValueTreeState::SliderAttachment> beatDivisionAttachment;
+    std::unique_ptr<AudioProcessorValueTreeState::SliderAttachment> numNotesAttachment;
+
+
+    //==============================================================================
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (BeatPeggiatorEditor)
+};
+
 
 //==============================================================================
 class BeatPeggiatorProcessor  : public AudioProcessor //, private AudioProcessorValueTreeState::Listener
@@ -347,69 +411,6 @@ public:
 
 private:
     
-    class BeatPeggiatorEditor : public AudioProcessorEditor
-    {
-    public:
-        BeatPeggiatorEditor (BeatPeggiatorProcessor& p, AudioProcessorValueTreeState& vts)
-        : AudioProcessorEditor (p),
-          parameters (vts)
-        {
-            numNotesSlider.setSliderStyle (Slider::SliderStyle::LinearHorizontal);
-            numNotesSlider.setTextBoxStyle (Slider::TextEntryBoxPosition::TextBoxBelow, true, 50, 10);
-            numNotesSlider.setRange (0, 10, 1);
-            addAndMakeVisible (numNotesSlider);
-            
-            beatDivisionSlider.setSliderStyle (Slider::SliderStyle::LinearHorizontal);
-            beatDivisionSlider.setTextBoxStyle (Slider::TextEntryBoxPosition::TextBoxBelow, true, 50, 10);
-            beatDivisionSlider.setRange (0, 10, 1);
-            addAndMakeVisible (beatDivisionSlider);
-            
-            beatsSlider.setSliderStyle (Slider::SliderStyle::LinearHorizontal);
-            beatsSlider.setTextBoxStyle (Slider::TextEntryBoxPosition::TextBoxBelow, true, 50, 10);
-            beatsSlider.setRange (0, 10, 1);
-            addAndMakeVisible (beatsSlider);
-
-            numNotesAttachment = std::make_unique<AudioProcessorValueTreeState::SliderAttachment> (parameters, "numNotes", numNotesSlider);
-            beatDivisionAttachment = std::make_unique<AudioProcessorValueTreeState::SliderAttachment> (parameters, "beatDivision", beatDivisionSlider);
-
-            beatsAttachment = std::make_unique<AudioProcessorValueTreeState::SliderAttachment> (parameters, "beats", beatsSlider);
-
-
-            setSize (400, 800);
-
-        }
-        
-        void paint (Graphics& g) override
-        {
-            g.fillAll (Colours::black);
-                        
-        }
-        
-        void resized () override
-        {
-            auto bounds = getLocalBounds();
-            const int componentSize { 100 };
-            
-            numNotesSlider.setBounds (bounds.removeFromTop (200).withSizeKeepingCentre (componentSize, componentSize));
-            beatDivisionSlider.setBounds (bounds.removeFromTop (200).withSizeKeepingCentre (componentSize, componentSize));
-            beatsSlider.setBounds (bounds.removeFromTop (200).withSizeKeepingCentre (componentSize, componentSize));
-        }
-        
-    private:
-        AudioProcessorValueTreeState& parameters;
-        
-        Slider beatsSlider;
-        Slider beatDivisionSlider;
-        Slider numNotesSlider;
-        
-        std::unique_ptr<AudioProcessorValueTreeState::SliderAttachment> beatsAttachment;
-        std::unique_ptr<AudioProcessorValueTreeState::SliderAttachment> beatDivisionAttachment;
-        std::unique_ptr<AudioProcessorValueTreeState::SliderAttachment> numNotesAttachment;
-
-
-        //==============================================================================
-        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (BeatPeggiatorEditor)
-    };
    //==============================================================================
     AudioProcessorValueTreeState parameters;
     std::atomic<float>* numNotesParameter = nullptr;
