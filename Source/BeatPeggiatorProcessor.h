@@ -60,7 +60,8 @@ public:
 
     //==============================================================================
     BeatPeggiatorProcessor()
-        : AudioProcessor (BusesProperties()),
+        : AudioProcessor (BusesProperties().withInput  ("Input",  juce::AudioChannelSet::stereo(), true)
+                                           .withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
           parameters(*this, nullptr, "BeatPeggiator", createParameters())
     {
         parameters.addParameterListener("numNotes", this);
@@ -178,19 +179,19 @@ public:
     void releaseResources() override {}
     
     //==============================================================================
-    void sendNotes(MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& info)
+    void sendNotes(MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& info, double numSamples)
     {
         int idx = notes.size() == 0 ? 0 : std::rand() % notes.size();
 //        DBG("idx: " + std::to_string(idx));
         int noteNumber = notes[idx];
         MidiMessage noteOn = MidiMessage::noteOn(1, noteNumber, (uint8) 127);
         MidiMessage noteOff = MidiMessage::noteOff(1, noteNumber);
-
+        
         // adjust note start to be in correct position
         int noteStart = std::round(nextBeat * (rate * (double) 60.0/info.bpm)) - info.timeInSamples;
 
         midi.addEvent(noteOn, noteStart);
-        midi.addEvent(noteOff, 1000);
+        midi.addEvent(noteOff, numSamples - 1);
     }
     
     //==============================================================================
@@ -200,7 +201,7 @@ public:
         AudioPlayHead::CurrentPositionInfo info;
         getPlayHead()->getCurrentPosition(info);
         tempo = info.bpm;
-        jassert (buffer.getNumChannels() == 0);
+//        jassert (buffer.getNumChannels() == 0);
         auto numSamples = buffer.getNumSamples();
                 
         if (!info.isPlaying)
@@ -211,7 +212,7 @@ public:
         auto numNotesValue = parameters.getRawParameterValue("numNotes")->load();
         auto beatDivisionValue = parameters.getRawParameterValue("beatDivision")->load();
         auto beatsValue = parameters.getRawParameterValue("beats")->load();
-                                
+                                        
         for (const auto metadata : midi)
         {
             const auto msg = metadata.getMessage();
@@ -263,7 +264,7 @@ public:
 //                DBG("blockEnd: " + std::to_string(blockEnd));
 //                DBG("--------------------");
 
-                sendNotes(midi, info);
+                sendNotes(midi, info, numSamples);
                 
                 if (numNotesValue == 1)
                 {
