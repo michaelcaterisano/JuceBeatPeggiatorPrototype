@@ -61,23 +61,34 @@ public:
     //==============================================================================
     BeatPeggiatorProcessor()
         : AudioProcessor (BusesProperties()),
-          parameters(*this, nullptr, "BeatPeggiator",
-          {std::make_unique<AudioParameterInt> ("beats", "Beats", 1, 10, 1) })
+          parameters(*this, nullptr, "BeatPeggiator", createParameters())
     {
+        parameters.addParameterListener("numNotes", this);
+        parameters.addParameterListener("beatDivision", this);
         parameters.addParameterListener("beats", this);
+
         
         std::srand(std::time(NULL));
-        addParameter(beatDivision = new AudioParameterInt("beatDivision", "Beat Division", 1, 10, 1));
-        addParameter(numNotes = new AudioParameterInt("numNotes", "Number Of Notes", 1, 10, 1));
+//        addParameter(beatDivision = new AudioParameterInt("beatDivision", "Beat Division", 1, 10, 1));
+//        addParameter(numNotes = new AudioParameterInt("numNotes", "Number Of Notes", 1, 10, 1));
         
     }
+    //==============================================================================
+    AudioProcessorValueTreeState::ParameterLayout createParameters()
+        {
+            std::vector<std::unique_ptr<RangedAudioParameter>> parameters;
+            
+            parameters.push_back (std::make_unique<AudioParameterInt> ("beats", "Beats", 1, 10, 1));
+            parameters.push_back (std::make_unique<AudioParameterInt> ("beatDivision", "Beat Division", 1, 10, 1));
+            parameters.push_back (std::make_unique<AudioParameterInt> ("numNotes", "Number Of Notes", 1, 10, 1));
+
+            return { parameters.begin(), parameters.end() };
+        }
 
        
     //==============================================================================
      void generateBeatMap(int numNotes, int beatDivision, std::vector<int> &beatMap)
     {
-//        DBG("generateBeatMap()");
-//        DBG("beatDivision: " + std::to_string(beatDivision));
         beatMap = std::vector<int>(beatDivision, 0);
         
          for (int i = 0; i < numNotes; i++)
@@ -91,38 +102,6 @@ public:
          }
     }
      
-     //==============================================================================
-//     void generateNoteDurations(float &tempo, int &beats, int beatDivision, std::vector<int> &beatMap)
-//     {
-//         const double noteLength = (double) beats/beatDivision;
-//         double sum = 0.0;
-//
-//         for (int i = 0; i < beatMap.size(); i++)
-//         {
-//             if (i == 0 && beatMap[i] == 0)
-//             {
-//
-//                 continue;
-//             }
-//             else if (i == 0 && beatMap[i] == 1)
-//             {
-//
-//                 noteDurations.push_back(sum);
-//             }
-//             else if (beatMap[i] == 0)
-//             {
-//
-//                 sum = sum + noteLength;
-//             }
-//             else if (beatMap[i] == 1)
-//             {
-//
-//                 sum = sum + noteLength;
-//                 noteDurations.push_back(sum);
-//                 sum = 0.0;
-//             }
-//         }
-//     }
     //==============================================================================
     void generateNoteDurations(int beatDivision)
     {
@@ -192,8 +171,8 @@ public:
         newBeat = true;
         noteSent = false;
         rate = sampleRate;
-        prevNumNotes = numNotes->get();
-        prevBeatDivision = beatDivision->get();
+//        prevNumNotes = numNotes->get();
+//        prevBeatDivision = beatDivision->get();
     }
 
     void releaseResources() override {}
@@ -229,8 +208,9 @@ public:
             newBeat = true;
         }
         
+        auto numNotesValue = parameters.getRawParameterValue("numNotes")->load();
+        auto beatDivisionValue = parameters.getRawParameterValue("beatDivision")->load();
         auto beatsValue = parameters.getRawParameterValue("beats")->load();
-//        DBG("beatsValue: " + std::to_string(beatsValue));
                                 
         for (const auto metadata : midi)
         {
@@ -238,7 +218,6 @@ public:
             if (msg.isNoteOn())
             {
                 notes.add(msg.getNoteNumber());
-//                DBG("notes: " + std::to_string(notes[0]));
             }
             if (msg.isNoteOff())
             {
@@ -252,21 +231,16 @@ public:
         {
             if (newBeat)
             {
-//                DBG("NEW BEAT/////////////////////");
                 
                 beatMap.clear();
                 noteDurations.clear();
                 beatPositions.clear();
                 
-                generateBeatMap(*numNotes, *beatDivision, beatMap);
-                generateNoteDurations(*beatDivision);
+                generateBeatMap(numNotesValue, beatDivisionValue, beatMap);
+                generateNoteDurations(beatDivisionValue);
                 generateBeatPositions(info);
                 
                 newBeat = false;
-
-//                logIntVector(beatMap);
-//                logDoubleVector(noteDurations);
-//                logDoubleVector(beatPositions);
                 
             }
             
@@ -291,7 +265,7 @@ public:
 
                 sendNotes(midi, info);
                 
-                if (*numNotes == 1)
+                if (numNotesValue == 1)
                 {
                     newBeat = true;
                     break;
@@ -353,16 +327,16 @@ public:
 
     void getStateInformation (MemoryBlock& destData) override
     {
-        DBG("getState");
-        MemoryOutputStream (destData, true).writeInt (*beatDivision);
-        MemoryOutputStream (destData, true).writeInt (*numNotes);
+//        DBG("getState");
+//        MemoryOutputStream (destData, true).writeInt (*beatDivision);
+//        MemoryOutputStream (destData, true).writeInt (*numNotes);
     }
 
     void setStateInformation (const void* data, int sizeInBytes) override
     {
-        DBG("setState");
-        beatDivision->setValueNotifyingHost (MemoryInputStream (data, static_cast<size_t> (sizeInBytes), false).readFloat());
-        numNotes->setValueNotifyingHost (MemoryInputStream (data, static_cast<size_t> (sizeInBytes), false).readFloat());
+//        DBG("setState");
+//        beatDivision->setValueNotifyingHost (MemoryInputStream (data, static_cast<size_t> (sizeInBytes), false).readFloat());
+//        numNotes->setValueNotifyingHost (MemoryInputStream (data, static_cast<size_t> (sizeInBytes), false).readFloat());
     }
     
 
@@ -375,14 +349,27 @@ private:
         : AudioProcessorEditor (p),
           parameters (vts)
         {
-            //Int
+            numNotesSlider.setSliderStyle (Slider::SliderStyle::LinearHorizontal);
+            numNotesSlider.setTextBoxStyle (Slider::TextEntryBoxPosition::TextBoxBelow, true, 50, 10);
+            numNotesSlider.setRange (0, 10, 1);
+            addAndMakeVisible (numNotesSlider);
+            
+            beatDivisionSlider.setSliderStyle (Slider::SliderStyle::LinearHorizontal);
+            beatDivisionSlider.setTextBoxStyle (Slider::TextEntryBoxPosition::TextBoxBelow, true, 50, 10);
+            beatDivisionSlider.setRange (0, 10, 1);
+            addAndMakeVisible (beatDivisionSlider);
+            
             beatsSlider.setSliderStyle (Slider::SliderStyle::LinearHorizontal);
             beatsSlider.setTextBoxStyle (Slider::TextEntryBoxPosition::TextBoxBelow, true, 50, 10);
             beatsSlider.setRange (0, 10, 1);
             addAndMakeVisible (beatsSlider);
-            
+
+            numNotesAttachment = std::make_unique<AudioProcessorValueTreeState::SliderAttachment> (parameters, "numNotes", numNotesSlider);
+            beatDivisionAttachment = std::make_unique<AudioProcessorValueTreeState::SliderAttachment> (parameters, "beatDivision", beatDivisionSlider);
+
             beatsAttachment = std::make_unique<AudioProcessorValueTreeState::SliderAttachment> (parameters, "beats", beatsSlider);
-            
+
+
             setSize (400, 800);
 
         }
@@ -398,6 +385,8 @@ private:
             auto bounds = getLocalBounds();
             const int componentSize { 100 };
             
+            numNotesSlider.setBounds (bounds.removeFromTop (200).withSizeKeepingCentre (componentSize, componentSize));
+            beatDivisionSlider.setBounds (bounds.removeFromTop (200).withSizeKeepingCentre (componentSize, componentSize));
             beatsSlider.setBounds (bounds.removeFromTop (200).withSizeKeepingCentre (componentSize, componentSize));
         }
         
@@ -405,17 +394,21 @@ private:
         AudioProcessorValueTreeState& parameters;
         
         Slider beatsSlider;
+        Slider beatDivisionSlider;
+        Slider numNotesSlider;
         
         std::unique_ptr<AudioProcessorValueTreeState::SliderAttachment> beatsAttachment;
-        
+        std::unique_ptr<AudioProcessorValueTreeState::SliderAttachment> beatDivisionAttachment;
+        std::unique_ptr<AudioProcessorValueTreeState::SliderAttachment> numNotesAttachment;
+
 
         //==============================================================================
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (BeatPeggiatorEditor)
     };
    //==============================================================================
     AudioProcessorValueTreeState parameters;
-    AudioParameterInt* beatDivision;
-    AudioParameterInt* numNotes;
+//    AudioParameterInt* beatDivision;
+//    AudioParameterInt* numNotes;
     
     int currentNote, lastNoteValue;
     int prevNumNotes, prevBeatDivision;
