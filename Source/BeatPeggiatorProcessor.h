@@ -59,20 +59,35 @@ public:
     : AudioProcessorEditor (p),
       parameters (vts)
     {
+        // num notes
         numNotesSlider.setSliderStyle (Slider::SliderStyle::LinearHorizontal);
         numNotesSlider.setTextBoxStyle (Slider::TextEntryBoxPosition::TextBoxBelow, true, 50, 10);
-        numNotesSlider.setRange (0, 10, 1);
         addAndMakeVisible (numNotesSlider);
         
+        numNotesLabel.setFont(14.0f);
+        numNotesLabel.setText("Number of Notes", NotificationType::dontSendNotification);
+        numNotesLabel.attachToComponent(&numNotesSlider, true);
+        
+        // beat division
         beatDivisionSlider.setSliderStyle (Slider::SliderStyle::LinearHorizontal);
         beatDivisionSlider.setTextBoxStyle (Slider::TextEntryBoxPosition::TextBoxBelow, true, 50, 10);
-        beatDivisionSlider.setRange (0, 10, 1);
         addAndMakeVisible (beatDivisionSlider);
         
+        beatDivisionLabel.setFont(14.0f);
+        beatDivisionLabel.setText("Beat Division", NotificationType::dontSendNotification);
+        beatDivisionLabel.attachToComponent(&beatDivisionSlider, true);
+        
+        
+        // beats
         beatsSlider.setSliderStyle (Slider::SliderStyle::LinearHorizontal);
         beatsSlider.setTextBoxStyle (Slider::TextEntryBoxPosition::TextBoxBelow, true, 50, 10);
-        beatsSlider.setRange (0, 10, 1);
+        beatsSlider.setEnabled(false);
         addAndMakeVisible (beatsSlider);
+        
+        beatsLabel.setFont(14.0f);
+        beatsLabel.setText("Beats", NotificationType::dontSendNotification);
+        beatsLabel.attachToComponent(&beatsSlider, true);
+        
 
         numNotesAttachment = std::make_unique<AudioProcessorValueTreeState::SliderAttachment> (parameters, "numNotes", numNotesSlider);
         beatDivisionAttachment = std::make_unique<AudioProcessorValueTreeState::SliderAttachment> (parameters, "beatDivision", beatDivisionSlider);
@@ -86,7 +101,25 @@ public:
     
     void paint (Graphics& g) override
     {
+        auto numNotesValue = parameters.getRawParameterValue("numNotes")->load();
+        auto beatDivisionValue = parameters.getRawParameterValue("beatDivision")->load();
+        
         g.fillAll (Colours::black);
+        
+        if (numNotesValue > beatDivisionValue)
+          {
+              numNotesOutOfRangeLabel.setFont(10.0f);
+              numNotesOutOfRangeLabel.setText("You can't do that.", NotificationType::dontSendNotification);
+              numNotesOutOfRangeLabel.setJustificationType(Justification::centredTop);
+              numNotesOutOfRangeLabel.attachToComponent(&numNotesSlider, false);
+          }
+        else
+        {
+            numNotesOutOfRangeLabel.setFont(10.0f);
+            numNotesOutOfRangeLabel.setText("", NotificationType::dontSendNotification);
+            numNotesOutOfRangeLabel.setJustificationType(Justification::centredTop);
+            numNotesOutOfRangeLabel.attachToComponent(&numNotesSlider, false);
+        }
                     
     }
     
@@ -103,9 +136,9 @@ public:
 private:
     AudioProcessorValueTreeState& parameters;
     
-    Slider beatsSlider;
-    Slider beatDivisionSlider;
-    Slider numNotesSlider;
+    Slider numNotesSlider, beatDivisionSlider, beatsSlider;
+    Label numNotesLabel, beatDivisionLabel, beatsLabel, numNotesOutOfRangeLabel;
+    
     
     std::unique_ptr<AudioProcessorValueTreeState::SliderAttachment> beatsAttachment;
     std::unique_ptr<AudioProcessorValueTreeState::SliderAttachment> beatDivisionAttachment;
@@ -278,6 +311,8 @@ public:
         auto numNotesValue = numNotesParameter->load();
         auto beatDivisionValue = beatDivisionParameter->load();
         auto beatsValue = beatsParameter->load();
+        
+        if (numNotesValue > beatDivisionValue) { numNotesValue = beatDivisionValue; }
                                         
         for (const auto metadata : midi)
         {
