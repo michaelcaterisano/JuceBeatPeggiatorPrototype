@@ -54,7 +54,7 @@
 
 
 //==============================================================================
-class BeatPeggiatorProcessor  : public AudioProcessor, private AudioProcessorValueTreeState::Listener
+class BeatPeggiatorProcessor  : public AudioProcessor //, private AudioProcessorValueTreeState::Listener
 {
 public:
 
@@ -64,14 +64,16 @@ public:
                                            .withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
           parameters(*this, nullptr, "BeatPeggiator", createParameters())
     {
-        parameters.addParameterListener("numNotes", this);
-        parameters.addParameterListener("beatDivision", this);
-        parameters.addParameterListener("beats", this);
-
-        
+//        parameters.addParameterListener("numNotes", this);
+//        parameters.addParameterListener("beatDivision", this);
+//        parameters.addParameterListener("beats", this);
         std::srand(std::time(NULL));
-//        addParameter(beatDivision = new AudioParameterInt("beatDivision", "Beat Division", 1, 10, 1));
-//        addParameter(numNotes = new AudioParameterInt("numNotes", "Number Of Notes", 1, 10, 1));
+        
+        numNotesParameter = parameters.getRawParameterValue("numNotes");
+        beatDivisionParameter = parameters.getRawParameterValue("beatDivision");
+        beatsParameter = parameters.getRawParameterValue("beats");
+        
+
         
     }
     //==============================================================================
@@ -209,9 +211,9 @@ public:
             newBeat = true;
         }
         
-        auto numNotesValue = parameters.getRawParameterValue("numNotes")->load();
-        auto beatDivisionValue = parameters.getRawParameterValue("beatDivision")->load();
-        auto beatsValue = parameters.getRawParameterValue("beats")->load();
+        auto numNotesValue = numNotesParameter->load();
+        auto beatDivisionValue = beatDivisionParameter->load();
+        auto beatsValue = beatsParameter->load();
                                         
         for (const auto metadata : midi)
         {
@@ -319,25 +321,27 @@ public:
 
     //==============================================================================
     
-    void parameterChanged (const String& parameterID, float newValue) override
-    {
-//        DBG("parameterChanged");
-//        DBG(parameterID + ": " + std::to_string(newValue));
-    }
+//    void parameterChanged (const String& parameterID, float newValue) override
+//    {
+////        DBG("parameterChanged");
+////        DBG(parameterID + ": " + std::to_string(newValue));
+//    }
     //==============================================================================
 
     void getStateInformation (MemoryBlock& destData) override
     {
-//        DBG("getState");
-//        MemoryOutputStream (destData, true).writeInt (*beatDivision);
-//        MemoryOutputStream (destData, true).writeInt (*numNotes);
+        auto state = parameters.copyState();
+        std::unique_ptr<juce::XmlElement> xml (state.createXml());
+        copyXmlToBinary (*xml, destData);
     }
 
     void setStateInformation (const void* data, int sizeInBytes) override
     {
-//        DBG("setState");
-//        beatDivision->setValueNotifyingHost (MemoryInputStream (data, static_cast<size_t> (sizeInBytes), false).readFloat());
-//        numNotes->setValueNotifyingHost (MemoryInputStream (data, static_cast<size_t> (sizeInBytes), false).readFloat());
+       std::unique_ptr<juce::XmlElement> xmlState (getXmlFromBinary (data, sizeInBytes));
+ 
+        if (xmlState.get() != nullptr)
+            if (xmlState->hasTagName (parameters.state.getType()))
+                parameters.replaceState (juce::ValueTree::fromXml (*xmlState));
     }
     
 
@@ -408,6 +412,9 @@ private:
     };
    //==============================================================================
     AudioProcessorValueTreeState parameters;
+    std::atomic<float>* numNotesParameter = nullptr;
+    std::atomic<float>* beatDivisionParameter = nullptr;
+    std::atomic<float>* beatsParameter = nullptr;
 //    AudioParameterInt* beatDivision;
 //    AudioParameterInt* numNotes;
     
