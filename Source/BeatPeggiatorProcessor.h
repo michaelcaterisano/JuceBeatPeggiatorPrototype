@@ -101,25 +101,25 @@ public:
     
     void paint (Graphics& g) override
     {
-        auto numNotesValue = parameters.getRawParameterValue("numNotes")->load();
-        auto beatDivisionValue = parameters.getRawParameterValue("beatDivision")->load();
+//        auto numNotesValue = parameters.getRawParameterValue("numNotes")->load();
+//        auto beatDivisionValue = parameters.getRawParameterValue("beatDivision")->load();
         
         g.fillAll (Colours::black);
         
-        if (numNotesValue > beatDivisionValue)
-          {
-              numNotesOutOfRangeLabel.setFont(10.0f);
-              numNotesOutOfRangeLabel.setText("You can't do that.", NotificationType::dontSendNotification);
-              numNotesOutOfRangeLabel.setJustificationType(Justification::centredTop);
-              numNotesOutOfRangeLabel.attachToComponent(&numNotesSlider, false);
-          }
-        else
-        {
-            numNotesOutOfRangeLabel.setFont(10.0f);
-            numNotesOutOfRangeLabel.setText("", NotificationType::dontSendNotification);
-            numNotesOutOfRangeLabel.setJustificationType(Justification::centredTop);
-            numNotesOutOfRangeLabel.attachToComponent(&numNotesSlider, false);
-        }
+//        if (numNotesValue > beatDivisionValue)
+//          {
+//              numNotesOutOfRangeLabel.setFont(10.0f);
+//              numNotesOutOfRangeLabel.setText("You can't do that.", NotificationType::dontSendNotification);
+//              numNotesOutOfRangeLabel.setJustificationType(Justification::centredTop);
+//              numNotesOutOfRangeLabel.attachToComponent(&numNotesSlider, false);
+//          }
+//        else
+//        {
+//            numNotesOutOfRangeLabel.setFont(10.0f);
+//            numNotesOutOfRangeLabel.setText("", NotificationType::dontSendNotification);
+//            numNotesOutOfRangeLabel.setJustificationType(Justification::centredTop);
+//            numNotesOutOfRangeLabel.attachToComponent(&numNotesSlider, false);
+//        }
                     
     }
     
@@ -161,9 +161,6 @@ public:
                                            .withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
           parameters(*this, nullptr, "BeatPeggiator", createParameters())
     {
-//        parameters.addParameterListener("numNotes", this);
-//        parameters.addParameterListener("beatDivision", this);
-//        parameters.addParameterListener("beats", this);
         std::srand(std::time(NULL));
         
         numNotesParameter = parameters.getRawParameterValue("numNotes");
@@ -178,10 +175,14 @@ public:
         {
             std::vector<std::unique_ptr<RangedAudioParameter>> parameters;
             
-            parameters.push_back (std::make_unique<AudioParameterInt> ("beats", "Beats", 1, 10, 1));
-            parameters.push_back (std::make_unique<AudioParameterInt> ("beatDivision", "Beat Division", 1, 10, 1));
-            parameters.push_back (std::make_unique<AudioParameterInt> ("numNotes", "Number Of Notes", 1, 10, 1));
-
+            numNotesParamCapture = new AudioParameterInt{"numNotes", "Number Of Notes", 1, 10, 1};
+            beatDivisionParamCapture = new AudioParameterInt{"beatDivision", "Beat Division", 1, 10, 1};
+            beatsParamCapture = new AudioParameterInt{"beats", "Beats", 1, 10, 1};
+            
+            parameters.push_back (std::unique_ptr<AudioParameterInt>(numNotesParamCapture));
+            parameters.push_back (std::unique_ptr<AudioParameterInt>(beatDivisionParamCapture));
+            parameters.push_back (std::unique_ptr<AudioParameterInt>(beatsParamCapture));
+                        
             return { parameters.begin(), parameters.end() };
         }
 
@@ -290,7 +291,7 @@ public:
         int noteStart = std::round(nextBeat * (rate * (double) 60.0/info.bpm)) - info.timeInSamples;
 
         midi.addEvent(noteOn, noteStart);
-        midi.addEvent(noteOff, numSamples - 1);
+        midi.addEvent(noteOff, 1000);
     }
     
     //==============================================================================
@@ -308,11 +309,31 @@ public:
             newBeat = true;
         }
         
-        auto numNotesValue = numNotesParameter->load();
-        auto beatDivisionValue = beatDivisionParameter->load();
-        auto beatsValue = beatsParameter->load();
+//        int numNotesValue = *numNotesParamCapture;
+//        int beatDivisionValue = *beatDivisionParamCapture;
+//        int beatsValue = *beatsParamCapture;
         
-        if (numNotesValue > beatDivisionValue) { numNotesValue = beatDivisionValue; }
+        if (*numNotesParamCapture > *beatDivisionParamCapture)
+        {
+            
+//            beatDivisionValue = numNotesValue;
+            int numNotesVal = *numNotesParamCapture;
+            int beatDivisionVal = *beatDivisionParamCapture;
+            *beatDivisionParamCapture = numNotesVal;
+            *numNotesParamCapture = beatDivisionVal;
+//            DBG("numNotesValue: " + std::to_string(numNotesValue));
+            DBG("numNotesParameter: " + std::to_string(numNotesParameter->load()));
+            DBG("numNotesParamCapture: " + std::to_string(*numNotesParamCapture));
+            
+            DBG("-----");
+            
+//            DBG("numNotesValue: " + std::to_string(beatDivisionValue));
+            DBG("numNotesParameter: " + std::to_string(beatDivisionParameter->load()));
+            DBG("numNotesParamCapture: " + std::to_string(*beatDivisionParamCapture));
+            DBG("--------------------------");
+        }
+        
+        
                                         
         for (const auto metadata : midi)
         {
@@ -338,8 +359,8 @@ public:
                 noteDurations.clear();
                 beatPositions.clear();
                 
-                generateBeatMap(numNotesValue, beatDivisionValue, beatMap);
-                generateNoteDurations(beatDivisionValue);
+                generateBeatMap(*numNotesParamCapture, *beatDivisionParamCapture, beatMap);
+                generateNoteDurations(*beatDivisionParamCapture);
                 generateBeatPositions(info);
                 
                 newBeat = false;
@@ -367,7 +388,7 @@ public:
 
                 sendNotes(midi, info, numSamples);
                 
-                if (numNotesValue == 1)
+                if (*numNotesParamCapture == 1)
                 {
                     newBeat = true;
                     break;
@@ -451,6 +472,10 @@ private:
     std::atomic<float>* numNotesParameter = nullptr;
     std::atomic<float>* beatDivisionParameter = nullptr;
     std::atomic<float>* beatsParameter = nullptr;
+    
+    AudioParameterInt* beatDivisionParamCapture;
+    AudioParameterInt* numNotesParamCapture;
+    AudioParameterInt* beatsParamCapture;
 //    AudioParameterInt* beatDivision;
 //    AudioParameterInt* numNotes;
     
